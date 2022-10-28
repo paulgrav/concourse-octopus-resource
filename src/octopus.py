@@ -11,17 +11,17 @@ def concourse_out(data):
 
 def concourse_check(data):
     api_key = data['source']['api_key']
-    space_id = data.get('source').get('space_identifier') or data.get('source').get('space_id')
+    space_id = data['source']['space_id']
     octopus_server_uri = data['source']['octopus_server_uri']
+    project_id = data['source']['project_id']
 
     assert (space_id != None)
-
-    url = f"{octopus_server_uri}/spaces/{space_id}/tasks"
+    url = f"{octopus_server_uri}/api/{space_id}/deployments?projects={project_id}&taskState=Success"
     req = requests.Request('GET', url, headers={ "X-Octopus-ApiKey": api_key})
     prepped = req.prepare()
     s = requests.Session()
     response = s.send(prepped)
-    items = [ {"TaskId": i['Id']} for i in response.json()['Items']]
+    items = [ {"DeploymentId": i['Id'], "WebRef": f"{octopus_server_uri}{i['Links']['Web']}"} for i in response.json()['Items']]
     print(json.dumps(items))
 
 
