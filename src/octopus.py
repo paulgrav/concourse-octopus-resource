@@ -4,6 +4,7 @@ import sys
 import json
 
 class ResourceType:
+
     def __init__(self, data):
         self.api_key = data['source']['api_key']
         self.space_id = data['source']['space_id']
@@ -11,11 +12,16 @@ class ResourceType:
         self.project_id = data['source']['project_id']
         self.version = data.get('version').get('DeploymentId')
 
-
     def concourse_in(data):
+        # Grab the octopus variableset for the deployment and allow the user to access the values
+        # don’t think we can pass in secrets
+
+        # The user will then execute something against the deployed software
         pass
 
     def concourse_out(data):
+        # The job/task completed.
+        # We need to update the state of the deployment, enter fail reason, attach any test results
         pass
 
     def concourse_check(self):
@@ -42,6 +48,7 @@ class ResourceType:
             if deploymentid == deployment['Id']:
                 break
         return result
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some integers.')
