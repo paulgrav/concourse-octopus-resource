@@ -1,5 +1,5 @@
 FROM python:3.11-bullseye
-LABEL maintainer="Paul Grave <paul@stomer.com>"
+LABEL maintainer="Paul Grave <paul@stomer.net>"
 
 WORKDIR /opt/resource
 
