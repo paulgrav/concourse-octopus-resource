@@ -1,4 +1,4 @@
 #!/bin/bash
 set -euf -o pipefail
 
-python ../src/octopus.py $(basename "$0") "$@"
+python $(dirname $0)/../src/octopus.py $(basename "$0") "$@"
