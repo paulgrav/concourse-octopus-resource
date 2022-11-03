@@ -127,11 +127,14 @@ class ResourceType:
         response = self._get_octopus_response(url)
         variables = {}
         for i in response.json()["Variables"]:
-            var_name = i["Name"].replace(" ", "_")
-            var_name = var_name.replace("[", ".")
-            var_name = var_name.replace("]", "")
+            var_name = self._sanitize_variable_name(i["Name"])
             variables[var_name] = i["Value"]
         return variables
+
+    def _sanitize_variable_name(self, variable_name):
+        output = variable_name.replace(" ", "_")
+        output = output.replace("[", ".")
+        return output.replace("]", "")
 
 
 if __name__ == "__main__":
