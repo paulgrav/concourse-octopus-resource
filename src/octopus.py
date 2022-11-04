@@ -29,7 +29,7 @@ class ResourceType:
         self.space_id = data["source"]["space_id"]
         self.octopus_server_uri = data["source"]["octopus_server_uri"]
         self.project_id = data["source"]["project_id"]
-        self.version = data.get("version", {}).get("ref")
+        self.version = data.get("version", {}).get("DeploymentId")
         self.auth_header = {"X-Octopus-ApiKey": self.api_key}
 
         self.params = data.get("params")
@@ -61,7 +61,7 @@ class ResourceType:
         self.logger.debug("concourse in with filepath: %s", filepath)
         deployment = self._get_deployment(self.version)
         output = {
-            "version": {"ref": self.version},
+            "version": self._concourseref_for_deployment(deployment),
             "metadata": self._metadata_from_deployment(deployment),
         }
 
@@ -98,23 +98,23 @@ class ResourceType:
             self._upload_artifact(artifact["Id"], os.path.join(filepath, artifact_path))
 
         output = {
-            "version": {"ref": deployment["Id"]},
+            "version": self._concourseref_for_deployment(deployment),
             "metadata": self._metadata_from_deployment(deployment),
         }
         self.logger.debug("Output: %s", output)
         print(json.dumps(output))
 
-    def concourse_check(self):
-        self.logger.info("Running check")
-        take = 30
-        if not self.version:
-            take = 1
+    def _concourseref_for_deployment(self, deployment):
+        return {
+            "DeploymentId": deployment["Id"],
+            "Created": deployment["Created"],
+            "DeployedBy": deployment["DeployedBy"],
+        }
 
-        url = f"{self.octopus_server_uri}/api/{self.space_id}/deployments?projects={self.project_id}&taskState=Success&take={take}"
-        response = self.requests_session.get(url)
-        items = self._latest_deployments_since_deploymentid(
-            response.json(), self.version
-        )
+    def concourse_check(self):
+        self.logger.info("Running check with version: %s", self.version)
+
+        items = self._latest_deployments_since_deploymentid(self.version)
         self.logger.debug("Output: %s", items)
         print(json.dumps(items))
 
@@ -146,13 +146,19 @@ class ResourceType:
         self.logger.debug("Create Artifact response: %s", output)
         return output
 
-    def _latest_deployments_since_deploymentid(self, deployments, deploymentid):
+    def _latest_deployments_since_deploymentid(self, deploymentid):
+        take = 30 if not deploymentid else 1
+        url = f"{self.octopus_server_uri}/api/{self.space_id}/deployments?projects={self.project_id}&taskState=Success&take={take}"
+        self.logger.debug("Checking deployments: %s", url)
+        response = self.requests_session.get(url)
         result = []
-        for deployment in deployments["Items"]:
-            result.append({"ref": deployment["Id"]})
+        for deployment in response.json()["Items"]:
+            result.append(self._concourseref_for_deployment(deployment))
             if deploymentid == deployment["Id"]:
                 break
-        return result.reverse()
+        self.logger.debug("Reverse order deployments: %s", result)
+        result.reverse()
+        return result
 
     def _get_variables(self, path):
         self.logger.info("Retrieving variable set.")
@@ -165,7 +171,6 @@ class ResourceType:
         return variables
 
     def _sanitize_variable_name(self, variable_name):
-        self.logger.info("Sanitizing variables.")
         output = variable_name.replace(" ", "_")
         output = output.replace("[", ".")
         return output.replace("]", "")
