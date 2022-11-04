@@ -152,7 +152,7 @@ class ResourceType:
             result.append({"ref": deployment["Id"]})
             if deploymentid == deployment["Id"]:
                 break
-        return result
+        return result.reverse()
 
     def _get_variables(self, path):
         self.logger.info("Retrieving variable set.")
