@@ -13,7 +13,7 @@ Used to run tasks after successful Octopus deployments. Use cases include run fu
 * `project_id`: _Required_ The project ID against which deployment events will be tracked.
 
 * `debug`: _Optional_ `true` or `false` Used to output debug messages.
- 
+
 
 ## Behavior
 
@@ -57,4 +57,10 @@ Octopus variables that reference other variables are not expanded.
 
 ### `out`:
 
-Not implemented.
+Attaches any artifacts to the deployment.
+
+Options are specified in the params.
+
+* `artifact_path`: _Required_ The path of the artifact to be uploaded.
+
+* `path`: _Required_ This must be the same as the resource name.

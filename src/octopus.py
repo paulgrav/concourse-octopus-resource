@@ -7,7 +7,13 @@ import pathlib
 import os
 import enum
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 class OctopusTaskState(enum.StrEnum):
@@ -17,7 +23,8 @@ class OctopusTaskState(enum.StrEnum):
 
 class ResourceType:
     def __init__(self, data):
-        logging.debug("Setup")
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Setup")
         self.api_key = data["source"]["api_key"]
         self.space_id = data["source"]["space_id"]
         self.octopus_server_uri = data["source"]["octopus_server_uri"]
@@ -27,11 +34,13 @@ class ResourceType:
 
         self.params = data.get("params")
         self.metadata = data.get("metadata")
+
+        session = requests.Session()
+        session.headers.update(self.auth_header)
+        self.requests_session = session
+
         if data["source"].get("debug"):
-            logging.basicConfig(
-                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                level=logging.DEBUG,
-            )
+            self.logger.setLevel(logging.DEBUG)
 
     def _metadata_from_deployment(self, deployment):
         return [
@@ -48,7 +57,8 @@ class ResourceType:
         ]
 
     def concourse_in(self, filepath):
-        logging.debug("concourse in with filepath: %s", filepath)
+        self.logger.info("Running in")
+        self.logger.debug("concourse in with filepath: %s", filepath)
         deployment = self._get_deployment(self.version)
         output = {
             "version": {"ref": self.version},
@@ -62,57 +72,79 @@ class ResourceType:
         with open(os.path.join(filepath, "variables.json"), "w") as file:
             file.write(json.dumps(release_variables))
 
-        logging.debug("Variables: %s", release_variables)
-        logging.debug("Output: %s", output)
+        self.logger.debug("Variables: %s", release_variables)
+        self.logger.debug("Output: %s", output)
         print(json.dumps(output))
 
     def concourse_out(self, filepath):
-        logging.debug("concourse out with filepath: %s", filepath)
-        logging.debug("filepath listdir: %s", os.listdir(filepath))
+        self.logger.info("Running in")
+        self.logger.debug("concourse out with filepath: %s", filepath)
+        self.logger.debug("filepath listdir: %s", os.listdir(filepath))
+        self.logger.debug(
+            "artifacts listdir: %s", os.listdir(os.path.join(filepath, "artifacts"))
+        )
         f = open(
             os.path.join(filepath, self.params.get("path"), "deployment.json"), "r"
         )
         deployment = json.load(f)
-        logging.debug("deployment file: %s", deployment)
+        self.logger.debug("deployment file: %s", deployment)
         f.close()
+
+        artifact_path = self.params.get("artifact_path")
+        if artifact_path:
+            artifact = self._create_artifact_resource(
+                deployment["TaskId"], os.path.basename(artifact_path)
+            )
+            self._upload_artifact(artifact["Id"], os.path.join(filepath, artifact_path))
 
         output = {
             "version": {"ref": deployment["Id"]},
             "metadata": self._metadata_from_deployment(deployment),
         }
-        logging.debug("Output: %s", output)
+        self.logger.debug("Output: %s", output)
         print(json.dumps(output))
 
     def concourse_check(self):
+        self.logger.info("Running check")
         take = 30
         if not self.version:
             take = 1
 
         url = f"{self.octopus_server_uri}/api/{self.space_id}/deployments?projects={self.project_id}&taskState=Success&take={take}"
-        response = self._get_octopus_response(url)
+        response = self.requests_session.get(url)
         items = self._latest_deployments_since_deploymentid(
             response.json(), self.version
         )
-        logging.debug("Output: %s", items)
+        self.logger.debug("Output: %s", items)
         print(json.dumps(items))
 
-    def _get_octopus_response(self, url):
-        return requests.get(url, headers=self.auth_header)
-
-    def _post_octopus_response(self, url, data):
-        headers = self.auth_header
-        return requests.post(url, headers=headers, data=json.dumps(data))
-
     def _get_deployment(self, deployment_id):
+        self.logger.info("Calling deployment API for ID: %s", deployment_id)
         url = f"{self.octopus_server_uri}/api/spaces/{self.space_id}/deployments/{deployment_id}"
-        response = self._get_octopus_response(url)
+        response = self.requests_session.get(url)
         return response.json()
 
-    def _set_task_state(self, task_id, state, reason):
-        url = f"{self.octopus_server_uri}/api/tasks/{task_id}/state"
-        body = {"Reason": reason, "State": state}
-        response = self._post_octopus_response(url, body)
-        return response.json()
+    def _upload_artifact(self, artifact_id, filepath):
+        self.logger.info("Uploading artifact: %s, %s", artifact_id, filepath)
+        url = f"{self.octopus_server_uri}/api/spaces/{self.space_id}/artifacts/{artifact_id}/content"
+        with open(filepath, "rb") as f:
+            response = self.requests_session.put(url, data=f)
+            self.logger.debug("Artifact upload reponse: %s", response.status_code)
+
+        return
+
+    def _create_artifact_resource(self, server_task_id, filename):
+        self.logger.info("Creating artifact resource: %s, %s", server_task_id, filename)
+        url = f"{self.octopus_server_uri}/api/spaces/{self.space_id}/artifacts"
+        data = {
+            "ServerTaskId": server_task_id,
+            "Filename": filename,
+        }
+        self.logger.debug("Create artifact body: %s", data)
+        response = self.requests_session.post(url, data=json.dumps(data))
+        output = response.json()
+        self.logger.debug("Create Artifact response: %s", output)
+        return output
 
     def _latest_deployments_since_deploymentid(self, deployments, deploymentid):
         result = []
@@ -123,8 +155,9 @@ class ResourceType:
         return result
 
     def _get_variables(self, path):
+        self.logger.info("Retrieving variable set.")
         url = f"{self.octopus_server_uri}/{path}"
-        response = self._get_octopus_response(url)
+        response = self.requests_session.get(url)
         variables = {}
         for i in response.json()["Variables"]:
             var_name = self._sanitize_variable_name(i["Name"])
@@ -132,12 +165,14 @@ class ResourceType:
         return variables
 
     def _sanitize_variable_name(self, variable_name):
+        self.logger.info("Sanitizing variables.")
         output = variable_name.replace(" ", "_")
         output = output.replace("[", ".")
         return output.replace("]", "")
 
 
 if __name__ == "__main__":
+    logger = logging.getLogger(__name__)
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("function", choices=["check", "in", "out"])
     parser.add_argument(
@@ -152,8 +187,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     datain = json.load(args.input_file)
-    logging.debug("Data received: %s", datain)
-    logging.debug("Parse args: %s", args)
+    logger.debug("Parse args: %s", args)
     resourceType = ResourceType(datain)
 
     if args.function == "check":
