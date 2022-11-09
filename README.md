@@ -33,7 +33,7 @@ Note that variable names are sanitised:
 - `]` is removed
 - ` ` is replaced with `_`
 
-e.g., `Octopus.Action.Package[shak-ng-karate].PackageId` becomes `Octopus.Action.Package.shak-ng-karate.PackageId`
+e.g., `Octopus.Action.Package[package-ref].PackageId` becomes `Octopus.Action.Package.package-ref.PackageId`
 
 Variables can be subsequently loaded via a `load_var` step e.g.,
 
