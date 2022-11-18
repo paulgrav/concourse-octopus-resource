@@ -14,6 +14,7 @@ Used to run tasks after successful Octopus deployments. Use cases include run fu
 
 * `debug`: _Optional_ `true` or `false` Used to output debug messages.
 
+* `name_filter`: _Optional_ Filter for the deployment name. A Python regular expression. The is usually part of the deployment name so this can be used to only check for deployments to a specific environment.
 
 ## Behavior
 

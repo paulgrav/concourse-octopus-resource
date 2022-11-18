@@ -6,7 +6,7 @@ import logging
 import pathlib
 import os
 import enum
-
+import re
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -29,6 +29,7 @@ class ResourceType:
         self.space_id = data["source"]["space_id"]
         self.octopus_server_uri = data["source"]["octopus_server_uri"]
         self.project_id = data["source"]["project_id"]
+        self.name_filter = data["source"].get("name_filter")
         self.version = data.get("version", {}).get("DeploymentId")
         self.auth_header = {"X-Octopus-ApiKey": self.api_key}
 
@@ -115,6 +116,8 @@ class ResourceType:
         self.logger.info("Running check with version: %s", self.version)
 
         items = self._latest_deployments_since_deploymentid(self.version)
+        if self.name_filter:
+            items = [i for i in items if re.search(self.name_filter, i["Name"])]
         self.logger.debug("Output: %s", items)
         print(json.dumps(items))
 
