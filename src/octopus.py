@@ -110,6 +110,7 @@ class ResourceType:
             "DeploymentId": deployment["Id"],
             "Created": deployment["Created"],
             "DeployedBy": deployment["DeployedBy"],
+            "Name": deployment["Name"]
         }
 
     def concourse_check(self):
