@@ -115,11 +115,24 @@ class ResourceType:
     def concourse_check(self):
         self.logger.info("Running check with version: %s", self.version)
 
-        items = self._latest_deployments_since_deploymentid(self.version)
+        # deployments in reverse order
+        deployments = self._latest_deployments_since_deploymentid(self.version)
+
+        # filter by the name_filter if set
         if self.name_filter:
-            items = [i for i in items if re.search(self.name_filter, i["Name"])]
-        self.logger.debug("Output: %s", items)
-        print(json.dumps(items))
+            deployments = [
+                i for i in deployments if re.search(self.name_filter, i["Name"])
+            ]
+
+        # create a list of concourse refs for the list of deployments
+        result = []
+        for deployment in deployments:
+            result.append(self._concourseref_for_deployment(deployment))
+            if self.version == deployment["Id"]:
+                break
+
+        self.logger.debug("Output: %s", result)
+        print(json.dumps(result))
 
     def _get_deployment(self, deployment_id):
         self.logger.info("Calling deployment API for ID: %s", deployment_id)
@@ -157,13 +170,6 @@ class ResourceType:
         jsonresponse = response.json()
         result = []
 
-        if not jsonresponse or not jsonresponse.get("Items"):
-            return result
-
-        for deployment in response.json()["Items"]:
-            result.append(self._concourseref_for_deployment(deployment))
-            if deploymentid == deployment["Id"]:
-                break
         self.logger.debug("Reverse order deployments: %s", result)
         result.reverse()
         return result
