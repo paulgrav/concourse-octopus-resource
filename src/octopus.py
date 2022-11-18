@@ -168,7 +168,7 @@ class ResourceType:
         self.logger.debug("Checking deployments: %s", url)
         response = self.requests_session.get(url)
         jsonresponse = response.json()
-        result = []
+        result = jsonresponse.get("Items", [])
 
         self.logger.debug("Reverse order deployments: %s", result)
         result.reverse()
