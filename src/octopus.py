@@ -154,7 +154,12 @@ class ResourceType:
         url = f"{self.octopus_server_uri}/api/{self.space_id}/deployments?projects={self.project_id}&taskState=Success&take={take}"
         self.logger.debug("Checking deployments: %s", url)
         response = self.requests_session.get(url)
+        jsonresponse = response.json()
         result = []
+
+        if not jsonresponse or not jsonresponse.get("Items"):
+            return result
+
         for deployment in response.json()["Items"]:
             result.append(self._concourseref_for_deployment(deployment))
             if deploymentid == deployment["Id"]:
