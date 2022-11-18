@@ -1,4 +1,4 @@
-![Image Build](https://github.com/paulgrav/concourse-octopus-resource/actions/workflows/image-push.yml/badge.svg?branch=main)
+![Image Build](https://github.com/paulgrav/concourse-octopus-deployment/actions/workflows/image-push.yml/badge.svg?branch=main)
 
 # Octopus Resource
 
